@@ -80,8 +80,9 @@
                     'created_at' =>$order->time,
                     'status' => $status['OrderStatus']
                 ];
-                array_push($statusOrders,$statusOrder);
                 orderTrackBack($order->dellyman_order_id,$order->order_id,);
+                array_push($statusOrders,$statusOrder);
+
             }?>
      <?php require_once('css/style.php') ?>
         <article class="status-content-area">

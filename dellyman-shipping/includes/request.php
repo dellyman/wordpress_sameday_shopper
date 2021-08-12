@@ -37,7 +37,7 @@
             $seller = wp_get_current_user(); 
             global $wpdb;
             $table_name = $wpdb->prefix . "dokan_orders"; 
-            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE seller_id = '$seller->ID'");
+            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE seller_id = '$seller->ID' AND (order_status = 'wc-processing' OR order_status = 'wc-dellyman') ");
             $orders = json_decode(json_encode($orders),true);
             $curl = curl_init();
             curl_setopt_array($curl, array(
@@ -107,7 +107,7 @@
                             <div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
                         </div>
-                        <div class="loader-text"> Sending pickup request</div>		
+                        <div class="loader-text"> Requesting for pick-up</div>		
                     </div>															
                 </div>
                 <div class="modal" id="modal" >
