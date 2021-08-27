@@ -26,12 +26,12 @@
                          for (let i = 0;  i < data.length;  i++) {
                             const element = data[i];
                              stringOrder = JSON.stringify(element);
-                             let toogle = `<div class='switch' >
+                             let toogle = `<div class='switch mt-3' >
                                                                 <input  class='switch-input' id='switch-${i}' type='checkbox' name='products[]'  onclick='changeQty(${i},${element.quantity})'  value='${stringOrder}'/>
                                                                 <label for="switch-${i}" class="switch-label">Switch</label>
                                                         </div>`;
                              if (element.quantity <= 0 ) {
-                                 toogle = `<div class="text-success">All items have been shipped</div>`
+                                 toogle = `<div class="text-success mt-3">All items have been shipped</div>`
                              }
                                 table += `<tr>
                                                         <td id="item-${i}">${ element.productName }<br>${toogle}
@@ -70,7 +70,7 @@ function changeQty(key, qty) {
         let checkbox = jQuery("#switch-" + key);
         if (checkbox.is(':checked')) {
             let input = `
-            <div id="div-${key}">
+            <div class="mt-3" id="div-${key}">
                 <input type="number" class="form-input" min="1" max="${qty}" placeholder="Quantity" id="input-${key}"/>
                 <button type="button" onclick="update(${key},${qty})" class="btn" id="update-${key}">Update</button>
                 <p id=error-${key}></p>
@@ -134,9 +134,15 @@ jQuery(document).on("mousemove touchstart touchend", function () {
     }
 });
 
-function confirm() {
+function confirm(data) {
         if (jQuery('#overlay').css('display') == "none") {
             jQuery("#overlay").css("display", "flex");
+            if (data == 'confirm') {
+                jQuery('#modal-message').css("display", "none");
+            }else{
+                jQuery('#modal-message').css("display", "block");
+                jQuery('#modal-info').css("display", "none");
+            }
         } else {
             jQuery("#overlay").css("display", "none");
         }
@@ -166,14 +172,13 @@ jQuery("#send-request").submit(function (e) {
         success: function (data) { 
             RemoveLoader();
             if (data) {
+                confirm()
                 if(data.ResponseCode == 100){
                     let successMsg = `Sucessfully sent #${data.orderID} to dellyman, we will be coming for the pickup later in the day. The Delivery ID is ${data.Reference}`;
                     message.html(successMsg);
-                    message.addClass('text-success');
 
                 }else{
                     message.html(data.ResponseMessage);
-                    message.addClass('text-error');
                 }
             }else{
                message.html("Please try again");

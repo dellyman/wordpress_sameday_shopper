@@ -1,6 +1,6 @@
 <style>
     .page-card{
-         width: 100%;
+        width: 100%;
         padding:20px;    
         position: relative;
         margin-top: 20px;
@@ -8,6 +8,10 @@
         box-shadow: 0 1px 1px rgba(0,0,0,.04);
         background: #fff;
         box-sizing: border-box;
+    }
+    .big-text{
+      font-size:16px;
+      font-weigth : 500;
     }
     .label{
         margin : 0.5rem 0;

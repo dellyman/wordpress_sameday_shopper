@@ -37,7 +37,7 @@
             $seller = wp_get_current_user(); 
             global $wpdb;
             $table_name = $wpdb->prefix . "dokan_orders"; 
-            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE seller_id = '$seller->ID'");
+            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE seller_id = '$seller->ID' AND (order_status = 'wc-processing' OR order_status = 'wc-dellyman') ");
             $orders = json_decode(json_encode($orders),true);
             $curl = curl_init();
             curl_setopt_array($curl, array(
@@ -64,7 +64,7 @@
         <article class="help-content-area">
    <form action="" id="send-request" method="post">
         	<h1>Request for pick-up</h1>
-              <div id="message" ></div>
+              <div ></div>
           	<div class="section mt-3">
                   <h5 class="m-0" >Step 1: Select order</h5>
                     Only orders with the payment status of PAID and fulfulment status of AWAITING PROCESSING or PROCESSING will be listed below.
@@ -97,7 +97,7 @@
             </div>
             
             <div class="mt-3">
-                <button  type="button" class="btn-same-day"  id="submit" onclick="confirm()"  disabled> Send for pick-up</button>
+                <button  type="button" class="btn-same-day"  id="submit" onclick="confirm('confirm')"  disabled> Send for pick-up</button>
              </div>
           </form>
              <div class="backdrop" id="overlay">
@@ -107,7 +107,7 @@
                             <div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
                         </div>
-                        <div class="loader-text"> Sending pickup request</div>		
+                        <div class="loader-text"> Requesting for pick-up</div>		
                     </div>															
                 </div>
                 <div class="modal" id="modal" >
@@ -116,6 +116,12 @@
                         <p>You want to ship these items</p>
                         <button class="btn btn-primary btn-medium" name="send" value="send" form="send-request">Yes</button>
                         <button class="btn btn-danger btn-medium"onclick="confirm()">No</button>
+                        <div class="actions">
+                        </div>														
+                    </div>
+                     <div class="modal-info text-center" id="modal-message">
+                        <div class="big-text" id="message"></div>
+                        <button class="btn btn-danger btn-medium"onclick="confirm()">OK</button>
                         <div class="actions">
                         </div>														
                     </div>																	

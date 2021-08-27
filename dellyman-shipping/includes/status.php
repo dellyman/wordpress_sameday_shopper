@@ -37,7 +37,7 @@
            $seller = wp_get_current_user(); 
             global $wpdb;
             $table_name = $wpdb->prefix . "dellyman_ship_products_status"; 
-            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE user_id = '$seller->ID' ",OBJECT);
+            $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE user_id = '$seller->ID' ORDER BY time DESC",OBJECT);
              global $wpdb;
             $table_name = $wpdb->prefix . "dellyman_user"; 
             $user = $wpdb->get_results("SELECT * FROM $table_name ",OBJECT);
@@ -80,15 +80,18 @@
                     'created_at' =>$order->time,
                     'status' => $status['OrderStatus']
                 ];
-                array_push($statusOrders,$statusOrder);
                 orderTrackBack($order->dellyman_order_id,$order->order_id,);
+                array_push($statusOrders,$statusOrder);
+
             }?>
-     <?php require_once('css/style.php') ?>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.0/css/jquery.dataTables.min.css">
+  
+    <?php require_once('css/style.php') ?>
         <article class="status-content-area">
         	<h1>Delivery status</h1>
         <p>Check the status of the products you've shipped </p>
         <div style="overflow-x:auto;">
-            <table>
+            <table id="status">
                 <thead>
                     <tr>
                         <th>Order Id</th>
@@ -128,7 +131,15 @@
                 </tbody>           
             </table>
         </div>
-   
+     <script src="https://cdn.datatables.net/1.11.0/js/jquery.dataTables.min.js"></script>
+     <script>
+          jQuery(document).ready( function () {
+               jQuery('#status').DataTable({
+                columnDefs: [ {bSortable: false, targets: [1]} ],
+                 "order": [[ 1, "desc" ]]              
+                });
+            } );
+     </script>
         </article><!-- .dashboard-content-area -->
 
          <?php

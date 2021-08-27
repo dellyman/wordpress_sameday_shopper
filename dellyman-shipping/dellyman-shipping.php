@@ -395,6 +395,11 @@ function post_products_dellyman_request(){
                 $products[$mainkey]['quantity'] = $products[$mainkey]['quantity'] - $ShipProduct->shipquantity;
             }
             //Updating products
+            $allQuantity = 0;
+            foreach ($products as $key => $product) {
+                $allQuantity = $allQuantity + $product['quantity'];
+            }
+
             global $wpdb;
             $table_name = $wpdb->prefix . "dellyman_ship_products";
             $dbData = array(
@@ -402,13 +407,25 @@ function post_products_dellyman_request(){
             );
             $wpdb->update($table_name, $dbData, array('user_id' => $seller->ID, 'order_id' => $orderid)); 
             
-            //Change Status
-            global $wpdb;
-            $table_name = $wpdb->prefix . "dokan_orders"; 
-            $dbData = array(
-                'order_status' =>'wc-dellyman'
-            );
-            $wpdb->update($table_name, $dbData, array('seller_id' => $seller->ID, 'order_id' =>$orderid)); 
+            
+            if ($allQuantity <= 0) {
+                   //Change Status
+                    global $wpdb;
+                    $table_name = $wpdb->prefix . "dokan_orders"; 
+                    $dbData = array(
+                        'order_status' =>'wc-completed'
+                    );
+                    $wpdb->update($table_name, $dbData, array('seller_id' => $seller->ID, 'order_id' =>$orderid)); 
+            }else {
+                   //Change Status
+                global $wpdb;
+                $table_name = $wpdb->prefix . "dokan_orders"; 
+                $dbData = array(
+                    'order_status' =>'wc-dellyman'
+                );
+                $wpdb->update($table_name, $dbData, array('seller_id' => $seller->ID, 'order_id' =>$orderid)); 
+            }
+         
         }
         $feedback['orderID'] = $_POST['order'];
     }else{
@@ -452,20 +469,21 @@ function orderTrackBack($dellyman_orderid,$orderid){
       //Getting Orders from Database with id 
         global $wpdb;
         $table_name = $wpdb->prefix . "dellyman_ship_products_status"; 
-        $user = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
+        $user = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' AND dellyman_order_id = '$dellyman_orderid' ",OBJECT);
         $user = $user[0];
-    if ($status['OrderStatus'] == 'CANCELLED' AND $user->is_TrackBack == 0 ) {
+    if ($status['OrderStatus'] == 'CANCELLED' AND $user->is_TrackBack == 0) {
          $products_shipped  = json_decode($user->products_shipped,true);
          //Get Orginal Products 
           global $wpdb;
         $table_name = $wpdb->prefix . "dellyman_ship_products"; 
         $orderUpdate = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
         $orderUpdate  = $orderUpdate [0];
+
         $productUpdated = json_decode($orderUpdate->products,true);
         
         foreach ($products_shipped as $mainkey => $product_shipped) {
             $key = array_search($product_shipped['id'],array_column($productUpdated,'id') );
-            $result = $productUpdated[$key]['quantity'] + $product_shipped['quantity'];
+            $result = $productUpdated[$key]['quantity'] + $product_shipped['shipquantity'];
             $productUpdated[$key]['quantity'] = $result;
         }
         $productUpdated = json_encode($productUpdated);
