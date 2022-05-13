@@ -54,16 +54,18 @@ class DellymanShipping
             $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id int(10) NOT NULL AUTO_INCREMENT,
             order_id varchar(255) DEFAULT '' NOT NULL,
+            product_id int(10) NOT NULL,
             user_id int(10) NOT NULL,
             product_name varchar(255) DEFAULT '' NOT NULL,
-            product_price varchar(255) DEFAULT '' NOT NULL,
-            product_quantity varchar(255) DEFAULT '' NOT NULL,
+            sku varchar(255) DEFAULT NULL,
+            price varchar(255) DEFAULT '' NOT NULL,
+            quantity int(10) DEFAULT 0 NOT NULL,
+            shipquantity int(10) DEFAULT 0 NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY  (id)
             ) $charset_collate";
             require_once( ABSPATH .'wp-admin/includes/upgrade.php' );
             dbDelta( $sql );
-            
   
             //Creating table that order status  
             global $wpdb;
@@ -76,7 +78,7 @@ class DellymanShipping
             user_id int(10) NOT NULL,
             dellyman_order_id int(10) NOT NULL,
             is_TrackBack boolean DEFAULT 0 NOT NULL,
-            dellyman_status boolean DEFAULT 0 NOT NULL,
+            dellyman_status varchar(255) DEFAULT 'PENDING' NOT NULL,
             reference_id varchar(255) DEFAULT '' NOT NULL,
             PRIMARY KEY  (id)
             ) $charset_collate;";
@@ -93,10 +95,11 @@ class DellymanShipping
             id int(10) NOT NULL AUTO_INCREMENT,
             order_id varchar(255) DEFAULT '' NOT NULL,
             dellyman_order_id int(10) NOT NULL,
-            user_id int(10) NOT NULL,
+            sku varchar(255) DEFAULT NULL,
+            product_id int(10) NOT NULL,
             product_name varchar(255) DEFAULT '' NOT NULL,
-            product_price varchar(255) DEFAULT '' NOT NULL,
-            product_quantity varchar(255) DEFAULT '' NOT NULL,
+            price varchar(255) DEFAULT '' NOT NULL,
+            quantity varchar(255) DEFAULT '' NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY  (id)
             ) $charset_collate";
@@ -154,11 +157,11 @@ function save_crendentials(){;
         $wpdb->update($table_name, $dbData, array('id' => 1)); 
     }
     $redirect = add_query_arg( 'status', 'success', 'admin.php?page=connect-to-dellyman');
-    wp_redirect( $redirect );
+    wp_redirect($redirect);
     exit;
 }
 
-function bookOrder($sameday,$carrier,$vendor_data,$shipping_address, $productNames,$pickupAddress,$vendorphone,$custPhone){
+function bookOrder($carrier,$vendor_data,$shipping_address, $productNames,$pickupAddress,$vendorphone,$custPhone, $store_city,$customer_city){
     $vendorName = $vendor_data["first_name"][0] .'  '.$vendor_data["last_name"][0];
     $phoneNumber = $vendor_data['billing_address_1'];
     $deliveredName = $shipping_address['first_name'] ." ". $shipping_address['last_name'];
@@ -188,13 +191,17 @@ function bookOrder($sameday,$carrier,$vendor_data,$shipping_address, $productNam
             'DeliveryGooglePlaceAddress' =>$shipping_address['address_1']." ,".$shipping_address['city'],
             'DeliveryLandmark' => "",
             'PackageDescription' => $productNames,
-            'ProductAmount' => "2000"
+            'ProductAmount' => "2000",
+            "PickUpCity" =>  $store_city,
+            "DeliveryCity" => $customer_city,
+            "PickUpState" => "Lagos",
+            "DeliveryState" => "Lagos"
             )
         ],
     );
     $jsonPostData = json_encode($postdata);
     global $wpdb;
-    $table_name = $wpdb->prefix . "dellyman_credentials"; 
+    $table_name = $wpdb->prefix . "woocommerce_dellyman_credentials"; 
     $user = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1");
     $ApiKey =  (!empty($user->API_KEY)) ? ($user->API_KEY) : ('');
 
@@ -219,97 +226,42 @@ function bookOrder($sameday,$carrier,$vendor_data,$shipping_address, $productNam
     $NoTags = strip_tags(preg_replace(array('~<br(.*?)</br>~Usi','~<b(.*?)</b>~Usi'), "", $responseJson));
     return json_decode($NoTags,true);
 }
-//Adding menu on vendor dashboard
-add_filter( 'dokan_query_var_filter', 'dokan_load_document_menu' );
-function dokan_load_document_menu( $query_vars ) {
-    $query_vars['help'] = 'request-for-shipping';
-    return $query_vars;
-}
-add_filter( 'dokan_get_dashboard_nav', 'dokan_add_help_menu' );
-function dokan_add_help_menu( $urls ) {
-    $urls['help'] = array(
-        'title' => __( 'Request for shipping', 'dokan'),
-        'icon'  => '<i class="fas fa-truck"></i>',
-        'url'   => dokan_get_navigation_url( 'request-for-shipping' ),
-        'pos'   => 51
-    );
-    return $urls;
-}
-add_action( 'dokan_load_custom_template', 'dokan_load_template' );
-function dokan_load_template( $query_vars ) {
-    if ( isset( $query_vars['request-for-shipping'] ) ) {
-        require_once ( 'includes/request.php');
-       }else {
-     // require_once ( 'includes/request.php');
-       }
-}
-add_filter( 'dokan_query_var_filter', 'dokan_load_delivery_status' );
-function dokan_load_delivery_status($query_vars) {
-    $query_vars['status'] = 'check-delivery-status';
-    return $query_vars;
-}
-add_filter( 'dokan_get_dashboard_nav', 'dokan_add_status_menu' );
-function dokan_add_status_menu( $urls ) {
-    $urls['status'] = array(
-        'title' => __( 'Delivery Status', 'dokan'),
-        'icon'  => '<i class="fas fa-info-circle"></i>',
-        'url'   => dokan_get_navigation_url( 'check-delivery-status' ),
-        'pos'   => 52
-    );
-    return $urls;
-}
-add_action( 'dokan_load_custom_template', 'dokan_load_delivery_template' );
-function dokan_load_delivery_template($query_vars) {
-    if (isset( $query_vars['check-delivery-status'] ) ) {
-        require_once ('includes/status.php');
-       }else {
-      //require_once ('includes/status.php');
-       }
-}
+
 
 function get_products_ajax_request(){
     if(isset($_REQUEST['orderid'])){
         $orderid = $_REQUEST['orderid'];
         global $wpdb;
-        $table_name = $wpdb->prefix . "dellyman_ship_products"; 
-        $user = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
-        if(empty($user)){
-            $order = wc_get_order( $orderid ); 
-            //var_dump($order->get_items());
-            $products = [];
+        $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+        $products = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
+        if(empty($products)){
+            $order = wc_get_order($orderid); 
             foreach ($order->get_items() as $key => $item ) {
-                    $productdata  = $item->get_product();
-                //   echo $item->get_name() .  $productdata->get_price() .$item->get_quantity();
-                $product = [
-                    'id'=>$item->get_product_id(),
-                    'productName'=> preg_replace("/\'s+/", "", $item->get_name()),
-                    'sku'=>$productdata->get_sku(),
-                    'price'=> $productdata->get_price(),
-                    'quantity' =>  $item->get_quantity(),
-                    'shipquantity' => 0
-                ];
-                array_push($products,$product);
+                $productdata  = $item->get_product();
+                $seller = wp_get_current_user();
+                $wpdb->insert( 
+                    $table_name, 
+                    array( 
+                        'created_at' => current_time('mysql'), 
+                        'product_id'=>$item->get_product_id(),
+                        'order_id' => $orderid, 
+                        'product_name' => preg_replace("/\'s+/", "", $item->get_name()), 
+                        'sku' => $productdata->get_sku(),
+                        'quantity' =>  $item->get_quantity(),
+                        'user_id' => $seller->ID, 
+                        'shipquantity' => 0,
+                        'price'=> $productdata->get_price()
+                    ) 
+                ); 
             }
-            $seller = wp_get_current_user();
-            $wpdb->insert( 
-                $table_name, 
-                array( 
-                    'created_at' => current_time( 'mysql' ), 
-                    'order_id' => $orderid, 
-                    'products' => json_encode($products), 
-                    'user_id' => $seller->ID, 
-                ) 
-            );   
+          
         }
-        global $wpdb;
-        $table_name = $wpdb->prefix . "dellyman_ship_products"; 
-        $user = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
-        $user = $user[0];
-        $products = json_decode($user->products,true);
+        $products = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
+
         //Customer
         $shippingOrder = new WC_Order($orderid);
         $shippingOrder->update_status("wc-ready-to-ship",'Ready to ship', TRUE); 
-        $shipping_address = $shippingOrder->get_address('shipping'); 
+        $shipping_address = $shippingOrder->get_address('billing'); 
         $customerName =  $shippingOrder->billing_first_name .' '. $shippingOrder->billing_last_name;
         $customerPhone = $shippingOrder ->billing_phone;
         $custData = [
@@ -344,18 +296,14 @@ function post_products_dellyman_request(){
          $allProductNames = "";
          foreach ($shipProducts as $key => $shipProduct) {
             if ($key == 0) {
-                  $allProductNames = $shipProduct->productName."(". round($shipProduct->shipquantity)  .")";
+                  $allProductNames = $shipProduct->product_name."(". round($shipProduct->shipquantity)  .")";
            }else{
-               $allProductNames = $allProductNames .",". $shipProduct->productName."(". round($shipProduct->shipquantity) .")";
+               $allProductNames = $allProductNames .",". $shipProduct->product_name."(". round($shipProduct->shipquantity) .")";
            }
          }
         $productNames = "Total item(s)-". count($shipProducts) ." Products - " .$allProductNames;
         
-        //Get email and password
-        global $wpdb;
-        $table_name = $wpdb->prefix . "dellyman_user"; 
-        $user = $wpdb->get_results("SELECT * FROM $table_name ",OBJECT);
-        $user = $user[0];
+  
 
         //Get Authentciation
         $seller = wp_get_current_user();
@@ -366,52 +314,70 @@ function post_products_dellyman_request(){
         $vendorphone = get_user_meta($seller->ID, 'billing_phone', true);
         $custPhone =  $order->get_billing_phone();
          $orderid = $_POST['order'] ;
+         $customer_city = $order->get_billing_city();
          //send order
-        $feedback = bookOrder($carrier,$vendor_data,$shipping_address, $productNames,$pickupAddress,$vendorphone,$custPhone);
+        $feedback = bookOrder($carrier,$vendor_data,$shipping_address, $productNames,$pickupAddress,$vendorphone,$custPhone, $store_city,$customer_city );
         
          if ($feedback['ResponseCode'] == 100) {
             $dellyman_orderid = $feedback['OrderID'];
             $Reference = $feedback['Reference'];
-            //Insert into delivery status in table
+            //Insert into delivery orders in table
             global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products_status";
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_orders";
             $wpdb->insert( 
                 $table_name, 
                 array( 
-                    'time' => current_time( 'mysql' ), 
+                    'time' => current_time('mysql'), 
                     'order_id' => $orderid,
                     'reference_id' => $Reference,
                     'dellyman_order_id' =>$dellyman_orderid,
-                    'products_shipped' => json_encode($shipProducts), 
                     'user_id' => $seller->ID, 
                 ) 
             );
+            //insert into shipped products
+            foreach ($shipProducts as $key => $item) {
+                global $wpdb;
+                $table_name = $wpdb->prefix . "woocommerce_dellyman_shipped_products";
+                $wpdb->insert( 
+                    $table_name, 
+                    array( 
+                        'created_at' => current_time('mysql'), 
+                        'product_id'=>$item->product_id,
+                        'order_id' => $orderid, 
+                        'product_name' => $item->product_name, 
+                        'dellyman_order_id' =>$dellyman_orderid,
+                        'sku' => $item->sku,
+                        'quantity' =>  $item->shipquantity,
+                        'price'=> $item->price
+                    ) 
+                ); 
+            }
+
             //Update product
             global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products"; 
-            $user = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid' ",OBJECT);
-            $user = $user[0];
-            $products = json_decode($user->products,true);
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+            $products = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid'",ARRAY_A);
     
             foreach ($shipProducts as $key => $ShipProduct) {
                 $mainkey = array_search($ShipProduct->id,array_column($products,'id'));
-                $products[$mainkey]['quantity'] = $products[$mainkey]['quantity'] - $ShipProduct->shipquantity;
+                $updatedQty = $products[$mainkey]['quantity'] - $ShipProduct->shipquantity;
+                global $wpdb;
+                $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+                //Update
+                $dbData = array(
+                    'quantity' => $updatedQty, 
+                    'shipquantity' => $ShipProduct->shipquantity
+                );
+                $wpdb->update($table_name, $dbData, array('id' => $shipProduct->id)); 
             }
+
             //Updating products
             $allQuantity = 0;
             foreach ($products as $key => $product) {
                 $allQuantity = $allQuantity + $product['quantity'];
             }
-
-            global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products";
-            $dbData = array(
-                'products' =>json_encode($products)
-            );
-            $wpdb->update($table_name, $dbData, array('user_id' => $seller->ID, 'order_id' => $orderid)); 
             
-            
-            if ($allQuantity <= 0) {
+            if ($allQuantity == 0) {
                 //Change Status
                 $order = new WC_Order($orderid);
                 $order->update_status("wc-fully-shipped", 'Fully Shipped', TRUE); 

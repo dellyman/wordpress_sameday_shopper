@@ -21,7 +21,7 @@
                      success: function (data) {
                          // This outputs the result of the ajax request (The Callback)
                          countTable = `<div class="d-flex justify-between ">
-                           <p><strong> ${data.products.length}  item(s) in the order</strong> ships to ${data.customerdata.address.address_1} ${ data.customerdata.address.city }</p>
+                           <p><strong> ${data.products.length}  ${ (data.products.length > 1) ? 'items' : 'item'} in the order</strong> ships to ${data.customerdata.address.address_1} ${ data.customerdata.address.city }</p>
                            <div>
                             <p class="m-0"><strong>Customer Name</strong> : ${data.customerdata.name}</p>
                             <p class="m-0"><strong>Customer Tel No</strong> : ${data.customerdata.customerPhone}</p>
@@ -39,7 +39,7 @@
                                  toogle = `<div class="text-success mt-3">All items have been shipped</div>`
                              }
                                 table += `<tr>
-                                                        <td id="item-${i}">${ element.productName }<br>${toogle}
+                                                        <td id="item-${i}">${ element.product_name }<br>${toogle}
                                                         </td>
                                                          <td>${ element.sku }</td>
                                                         <td>${element.quantity }</td>
