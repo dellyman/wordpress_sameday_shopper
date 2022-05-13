@@ -380,11 +380,11 @@ function post_products_dellyman_request(){
             if ($allQuantity == 0) {
                 //Change Status
                 $order = new WC_Order($orderid);
-                $order->update_status("wc-fully-shipped", 'Fully Shipped', TRUE); 
+                $order->update_status("wc-fully-shipped", 'Order moved to fully shipped', FALSE); 
             }else {
                 //Change Status
                 $order = new WC_Order($orderid);
-                $order->update_status("wc-partially-shipped",'Partially shipped', TRUE); 
+                $order->update_status("wc-partially-shipped",'Order moved to partially shipped', FALSE); 
             }
          
         }
@@ -464,43 +464,6 @@ function add_dellyman_custom_order_statuses($order_statuses) {
 }
 add_filter( 'wc_order_statuses', 'add_dellyman_custom_order_statuses' );
 
-//Adding Custom Delivery Status for dellyman
-function dokan_add_new_custom_order_status( $order_statuses ) {
-    $order_statuses[ 'wc-ready-to-ship' ] = _x( 'Ready to ship', 'Order status', 'text_domain' );
-    $order_statuses[ 'wc-partially-shipped' ]   = _x( 'Partially shipped', 'Order status', 'text_domain' );
-    $order_statuses[ 'wc-partially-delivered' ] = _x( 'Partially Delivered', 'Order status', 'text_domain' );
-	$order_statuses[ 'wc-fully-shipped' ] = _x( 'Fully Shipped', 'Order status', 'text_domain' );
-	$order_statuses[ 'wc-fully-delivered' ] = _x( 'Fully Delivered', 'Order status', 'text_domain' );
-    return $order_statuses;
-}
-add_filter( 'wc_order_statuses', 'dokan_add_new_custom_order_status', 12, 1 ); 
-
-function dokan_add_custom_order_status_button_class( $text, $status ) {
-    switch ( $status ) {
-        case 'wc-ready-to-ship':
-        case 'Ready to ship':
-            $text = 'info';
-            break;
-        case 'wc-partially-shipped':
-        case 'Partially shipped':
-            $text = 'info';
-            break;
-        case 'wc-partially-delivered':
-        case 'Partially Delivered':
-            $text = 'success';
-            break;     
-		case 'wc-fully-shipped':
-        case 'Fully Shipped':
-            $text = 'info';
-            break;  
-	    case 'wc-fully-delivered':
-        case 'Fully Delivered':
-            $text = 'info';
-            break; 
-    }       
-    return $text;
-}
-add_filter( 'dokan_get_order_status_class', 'dokan_add_custom_order_status_button_class', 10, 2 );
 
 // Webhook
 function change_status_order(WP_REST_Request $request) {
@@ -518,59 +481,60 @@ function change_status_order(WP_REST_Request $request) {
     if($key == $myKey){
         //Move order to deliver
         global $wpdb;
-        $table_name = $wpdb->prefix . "dellyman_ship_products_status"; 
+        $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
         $body  = json_decode($request->get_body());
         $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id =". $body['order']['OrderCode'] ." AND reference_id =". $body['order']['OrderID']);
+
         if($body['order']['OrderStatus'] == "COMPLETED"){
             //Get order to 
             $table_name = $wpdb->prefix . "wc_order_stats"; 
             $order = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id =". $order->order_id);
             if($order->status == "wc-partially-shipped"){
-                $newStatus = "wc-partially-delivered";
+                $order = new WC_Order($order->order_id);
+                $order->update_status("wc-partially-delivered", 'Order moved to partially delivered', FALSE); 
             }elseif($order->status == "wc-fully-shipped"){
-                $newStatus = "wc-fully-delivered";
+                $order = new WC_Order($order->order_id);
+                $order->update_status("wc-fully-delivered", 'Order moved to fully delivered', FALSE); 
             }
-            $dbData = array(
-                'order_status' => $newStatus 
-            );
-            $wpdb->update($table_name, $dbData, array('order_id' =>$order->order_id)); 
         }else{
             //Track Back
-            $products_shipped  = json_decode($order->products_shipped,true);
-            //Get Orginal Products 
+            //Get Products 
             global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products"; 
-            $orderUpdate = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id = '$order->order_id' ",OBJECT);
-            $productUpdated = json_decode($orderUpdate->products,true);
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+            $products = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$order->order_id'",OBJECT);
+            global $wpdb;
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_shipped_products"; 
+            $products_shipped = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$order->order_id'",ARRAY_A);
+
                 
-            foreach ($products_shipped as $mainkey => $product_shipped) {
-                $key = array_search($product_shipped['id'],array_column($productUpdated,'id') );
-                $result = $productUpdated[$key]['quantity'] + $product_shipped['shipquantity'];
-                $productUpdated[$key]['quantity'] = $result;
+            foreach ($products_shipped as $mainkey => $item) {
+
+                $key = array_search($item ->id,array_column($products,'id') );
+                $quantity = $products[$key]['quantity'] + $item->quantity;
+                $ship_quantity = $products[$key]['shipquantity'] - $item->quantity;
+
+                global $wpdb;
+                $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+                //Update
+                $dbData = array(
+                    'quantity' => $quantity, 
+                    'shipquantity' => $ship_quantity
+                );
+                $wpdb->update($table_name, $dbData, array('id' => $products[$key]['id'])); 
             }
-            $productUpdated = json_encode($productUpdated);
-                
-            //Change Updated Products Quantites
-            global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products"; 
-            $dbData = array(
-                'products' => $productUpdated
-            );
-            $wpdb->update($table_name, $dbData, array('order_id' => $order->order_id)); 
+ 
                 
             //Update is TrackBack to 1
             global $wpdb;
-            $table_name = $wpdb->prefix . "dellyman_ship_products_status"; 
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
             $dbData = array(
                 'is_TrackBack' => 1
             );
             $wpdb->update($table_name, $dbData, array('dellyman_order_id' => $body['order']['OrderCode'], 'order_id' => $order->order_id));   
         }
-
     }
 
 }
-
 // * This function is where we register our routes for our example endpoint.
 // */
 function prefix_register_product_routes() {
