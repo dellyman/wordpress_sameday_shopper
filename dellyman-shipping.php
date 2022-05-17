@@ -586,7 +586,7 @@ function custom_dellyman_post_order_status() {
       'exclude_from_search'       => false,
       'label_count'               => _n_noop( 'Partially shipped <span class="count">(%s)</span>', 'Partially shipped <span class="count">(%s)</span>' )
   ) );
-  register_post_status( 'wc-partially-delivered', array(
+  register_post_status( 'wc-partially-deliver', array(
     'label'                     => 'Partially delivered',
     'public'                    => true,
     'show_in_admin_status_list' => true,
@@ -622,10 +622,10 @@ function add_dellyman_custom_order_statuses($order_statuses) {
 
       $new_order_statuses[ $key ] = $status;
 
-      if ( 'wc-completed' === $key ) {
+      if ('wc-completed' === $key ) {
           $new_order_statuses['wc-ready-to-ship'] = 'Ready to ship';
           $new_order_statuses['wc-partially-shipped'] = 'Partially shipped';
-          $new_order_statuses['wc-partially-delivered'] = 'Partially Delivered';
+          $new_order_statuses['wc-partially-deliver'] = 'Partially Delivered';
           $new_order_statuses['wc-fully-shipped'] = 'Fully Shipped';
           $new_order_statuses['wc-fully-delivered'] = 'Fully Delivered';
       }
@@ -649,24 +649,27 @@ function change_status_order(WP_REST_Request $request) {
     $webhook_url =  (!empty($user->webhook_url)) ? $user->webhook_url : ''; 
 
     $myKey = hash_hmac('sha256', $webhook_url, $Web_HookSecret);
+  
      
     if($key == $myKey){
         //Move order to deliver
         global $wpdb;
         $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
-        $body  = json_decode($request->get_body());
-        $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id =". $body['order']['OrderCode'] ." AND reference_id =". $body['order']['OrderID']);
+        $body = json_decode($request->get_body(),true);
+        $orderID = $body['order']['OrderID'];
+        $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id = ". $orderID);
 
         if($body['order']['OrderStatus'] == "COMPLETED"){
             //Get order to 
+        
             $table_name = $wpdb->prefix . "wc_order_stats"; 
-            $order = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id =". $order->order_id);
+            $order = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id = ". $order->order_id);
             if($order->status == "wc-partially-shipped"){
                 $order = new WC_Order($order->order_id);
-                $order->update_status("wc-partially-delivered", 'Order moved to partially delivered', FALSE); 
+                $order->update_status("wc-partially-deliver", 'Order moveed to partially delivered', FALSE); 
             }elseif($order->status == "wc-fully-shipped"){
                 $order = new WC_Order($order->order_id);
-                $order->update_status("wc-fully-delivered", 'Order moved to fully delivered', FALSE); 
+                $order->update_status("wc-fully-delivered", 'Order moveed to fully delivered', FALSE); 
             }
         }else{
             //Track Back
@@ -705,7 +708,7 @@ function change_status_order(WP_REST_Request $request) {
             $wpdb->update($table_name, $dbData, array('dellyman_order_id' => $body['order']['OrderCode'], 'order_id' => $order->order_id));   
         }
     }else{
-        echo "Not from dellyman";
+        //echo "Not from dellyman";
     }
 
 }
