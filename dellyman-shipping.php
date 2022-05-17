@@ -114,8 +114,177 @@ if ( class_exists('DellymanShipping')  ) {
 register_activation_hook(__FILE__, array(  $dellymanShipping , 'activatePlugin' ));
 //Wordpress Deactivation Hook
 register_deactivation_hook(__FILE__, array(  $dellymanShipping , 'deactivatePlugin' ));
+
+
+if( ! class_exists( 'WP_List_Table' ) ) {
+    require_once( ABSPATH . 'wp-admin/includes/class-wp-list-table.php' );
+}
+// Extending class
+class DellymanOrders extends WP_List_Table
+{
+      private $orders;
+
+      private function get_dellyman_orders($search = "")
+      {
+            global $wpdb;
+
+            if (!empty($search)) {
+                  return $wpdb->get_results(
+                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders WHERE order_id Like '%{$search}%' OR dellyman_order_id Like '%{$search}%'",
+                        ARRAY_A
+                  );
+            }else{
+                  return $wpdb->get_results(
+                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders",
+                        ARRAY_A
+                  );
+            }
+      }
+
+      // Define table columns
+      function get_columns()
+      {
+            $columns = array(
+                  'cb'            => '<input type="checkbox" />',
+                  'order_id' => 'Order Id',
+                  'dellyman_order_id' => 'Dellyman Order ID',
+                  'reference_id'    => 'Reference Id',
+                  'item'      => 'Items',
+                  'status' => 'Status',
+                  'time' => 'Created'
+            );
+            return $columns;
+      }
+
+      // Bind table with columns, data and all
+      function prepare_items()
+      {
+            if (isset($_POST['page']) && isset($_POST['s'])) {
+                  $this->orders = $this->get_dellyman_orders($_POST['s']);
+            } else {
+                  $this->orders = $this->get_dellyman_orders();
+            }
+
+            $columns = $this->get_columns();
+            $hidden = array();
+            $sortable = $this->get_sortable_columns();
+            $this->_column_headers = array($columns, $hidden, $sortable);
+
+            /* pagination */
+            $per_page = 20;
+            $current_page = $this->get_pagenum();
+            $total_items = count($this->orders);
+
+            $this->orders = array_slice($this->orders, (($current_page - 1) * $per_page), $per_page);
+
+            $this->set_pagination_args(array(
+                  'total_items' => $total_items, // total number of items
+                  'per_page'    => $per_page // items to show on a page
+            ));
+
+            usort($this->orders, array(&$this, 'usort_reorder'));
+
+            $this->items = $this->orders;
+      }
+
+      // bind data with column
+      function column_default($item, $column_name)
+      {
+            switch ($column_name) {
+                  case 'order_id':
+                        return '#'. $item['order_id'];
+                  case 'dellyman_order_id':
+                  case 'reference_id':
+                        return $item[$column_name];
+                  case 'item':
+                        $order = $item['dellyman_order_id'];
+                        global $wpdb;
+                        $table_name = $wpdb->prefix . "woocommerce_dellyman_shipped_products"; 
+                        $products = $wpdb->get_results("SELECT * FROM $table_name WHERE dellyman_order_id = '$order'",OBJECT);
+                        $allProductNames = "";
+                        foreach ($products as $key => $shipProduct) {
+                           if ($key == 0) {
+                                 $allProductNames = $shipProduct->product_name."(". round($shipProduct->quantity)  .")";
+                          }else{
+                              $allProductNames = $allProductNames .",". $shipProduct->product_name."(". round($shipProduct->quantity) .")";
+                          }
+                        }
+                       $productNames = "Total item(s)-". count($products) ." Products - " .$allProductNames;
+                        return $productNames; 
+                    case 'status':        
+                        global $wpdb;
+                        $table_name = $wpdb->prefix . "woocommerce_dellyman_credentials"; 
+                        $user = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1");
+                        $ApiKey =  (!empty($user->API_KEY)) ? $user->API_KEY : '';                                        
+                        $response = wp_remote_post( 'https://dev.dellyman.com/api/v3.0/TrackOrder', array(
+                            'body'    => json_encode([
+                                'OrderID' => $item['dellyman_order_id'],
+                                'CustomerID' => 8
+                            ]),
+                            'headers' => [
+                                'Authorization' => 'Bearer '. $ApiKey
+                            ]
+                        ));
+                        $status = wp_remote_retrieve_body( $response );
+                        return json_encode($status);
+                    case 'time':
+                        return date("F j, Y, g:i a", strtotime($item['time'])); 
+                  default:
+                        return print_r($item, true); //Show the whole array for troubleshooting purposes
+            }
+      }
+
+      // To show checkbox with each row
+      function column_cb($item)
+      {
+            return sprintf(
+                  '<input type="checkbox" name="user[]" value="%s" />',
+                  $item['order_id']
+            );
+      }
+
+      // Add sorting to columns
+      protected function get_sortable_columns()
+      {
+            $sortable_columns = array(
+                  'order_id'  => array('order_id', false),
+                  'dellyman_order_id' => array('dellyman_order_id', false),
+                  'reference_id'   => array('reference_id', true)
+            );
+            return $sortable_columns;
+      }
+
+      // Sorting function
+      function usort_reorder($a, $b)
+      {
+            // If no sort, default to user_login
+            $orderby = (!empty($_GET['orderby'])) ? $_GET['orderby'] : 'order_id';
+            // If no order, default to asc
+            $order = (!empty($_GET['order'])) ? $_GET['order'] : 'asc';
+            // Determine sort order
+            $result = strcmp($a[$orderby], $b[$orderby]);
+            // Send final sort direction to usort
+            return ($order === 'asc') ? $result : -$result;
+      }
+}
+
 function index_page(){
-    include_once('includes/request.php');
+ 
+      // Creating an instance
+      $orderTable = new DellymanOrders();
+
+      echo '<div class="wrap"><h2>Dellyman orders</h2>';
+      // Prepare table
+      $orderTable->prepare_items();
+      ?>
+            <form method="post">
+                  <input type="hidden" name="page" value="employees_list_table" />
+                  <?php $orderTable->search_box('search', 'search_id'); ?>
+            </form>
+      <?php
+      // Display table
+      $orderTable->display();
+      echo '</div>';
 }
 function login_page() {
     include_once('includes/login.php');
@@ -169,7 +338,7 @@ function bookOrder($carrier,$vendor_data,$shipping_address, $productNames,$picku
     $date =  date("d/m/Y");
     $postdata = array( 
         'CustomerID' => 0,
-        'PaymentMode' => 'pickup',
+        'PaymentMode' => 'online',
         'FixedDeliveryCharge' => 10,
         'Vehicle' => $carrier,
         'IsProductOrder' => 0,
@@ -456,6 +625,9 @@ function add_dellyman_custom_order_statuses($order_statuses) {
       if ( 'wc-completed' === $key ) {
           $new_order_statuses['wc-ready-to-ship'] = 'Ready to ship';
           $new_order_statuses['wc-partially-shipped'] = 'Partially shipped';
+          $new_order_statuses['wc-partially-delivered'] = 'Partially Delivered';
+          $new_order_statuses['wc-fully-shipped'] = 'Fully Shipped';
+          $new_order_statuses['wc-fully-delivered'] = 'Fully Delivered';
       }
     
   }
@@ -470,7 +642,7 @@ function change_status_order(WP_REST_Request $request) {
     // In practice this function would fetch the desired data. Here we are just making stuff up.
     $key  = $request->get_header('X-Dellyman-Signature');
     global $wpdb;
-    $table_name = $wpdb->prefix . "dellyman_credentials"; 
+    $table_name = $wpdb->prefix . "woocommerce_dellyman_credentials"; 
     $user = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1");
     $ApiKey =  (!empty($user->API_KEY)) ? $user->API_KEY : '';
     $Web_HookSecret =  (!empty($user->Web_HookSecret)) ? $user->Web_HookSecret : '';
@@ -532,6 +704,8 @@ function change_status_order(WP_REST_Request $request) {
             );
             $wpdb->update($table_name, $dbData, array('dellyman_order_id' => $body['order']['OrderCode'], 'order_id' => $order->order_id));   
         }
+    }else{
+        echo "Not from dellyman";
     }
 
 }
