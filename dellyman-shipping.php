@@ -660,12 +660,11 @@ function change_status_order(WP_REST_Request $request) {
         global $wpdb;
         $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
         $body = json_decode($request->get_body(),true);
-        $orderID = $body['order']['OrderID'];
+        $orderID = $body['order']['OrderCode'];
         $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id = ". $orderID);
 
         if($body['order']['OrderStatus'] == "COMPLETED"){
             //Get order to 
-        
             $table_name = $wpdb->prefix . "wc_order_stats"; 
             $order = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id = ". $order->order_id);
             if($order->status == "wc-partially-shipped"){
@@ -675,7 +674,7 @@ function change_status_order(WP_REST_Request $request) {
                 $order = new WC_Order($order->order_id);
                 $order->update_status("wc-fully-delivered", 'Order moveed to fully delivered', FALSE); 
             }
-        }else{
+        }elseif($body['order']['OrderStatus'] == "CANCELLED"){
             //Track Back
             //Get Products 
             global $wpdb;
