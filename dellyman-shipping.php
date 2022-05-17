@@ -135,7 +135,7 @@ class DellymanOrders extends WP_List_Table
                   );
             }else{
                   return $wpdb->get_results(
-                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders",
+                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders ORDER BY time DESC",
                         ARRAY_A
                   );
             }
@@ -541,12 +541,16 @@ function post_products_dellyman_request(){
             }
 
             //Updating products
+            //Update product
+            global $wpdb;
+            $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+            $products = $wpdb->get_results("SELECT * FROM $table_name WHERE order_id = '$orderid'",ARRAY_A);
             $allQuantity = 0;
             foreach ($products as $key => $product) {
                 $allQuantity = $allQuantity + $product['quantity'];
             }
             
-            if ($allQuantity == 0) {
+            if ($allQuantity < 1) {
                 //Change Status
                 $order = new WC_Order($orderid);
                 $order->update_status("wc-fully-shipped", 'Order moved to fully shipped', FALSE); 
@@ -666,7 +670,7 @@ function change_status_order(WP_REST_Request $request) {
             $order = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id = ". $order->order_id);
             if($order->status == "wc-partially-shipped"){
                 $order = new WC_Order($order->order_id);
-                $order->update_status("wc-partially-deliver", 'Order moveed to partially delivered', FALSE); 
+                $order->update_status("wc-partially-deliver", 'Order moved to partially delivered', FALSE); 
             }elseif($order->status == "wc-fully-shipped"){
                 $order = new WC_Order($order->order_id);
                 $order->update_status("wc-fully-delivered", 'Order moveed to fully delivered', FALSE); 

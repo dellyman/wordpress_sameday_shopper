@@ -3,7 +3,7 @@
         $seller = wp_get_current_user(); 
         global $wpdb;
         $table_name = $wpdb->prefix . "wc_order_stats"; 
-        $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE (status = 'wc-completed' OR status ='wc-processing'  OR status = 'wc-ready-to-ship'  OR status = 'wc-partially-delivered' OR status = 'wc-partially-shipped') ");
+        $orders = $wpdb->get_results("SELECT * FROM $table_name WHERE (status = 'wc-completed' OR status ='wc-processing'  OR status = 'wc-ready-to-ship'  OR status = 'wc-partially-deliver' OR status = 'wc-partially-shipped') ");
         $orders = json_decode(json_encode($orders),true);
         $response = wp_remote_get( 'https://dev.dellyman.com/api/v3.0/Vehicles' );
         $carriers = wp_remote_retrieve_body( $response );
