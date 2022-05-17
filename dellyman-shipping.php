@@ -218,15 +218,15 @@ class DellymanOrders extends WP_List_Table
                         $ApiKey =  (!empty($user->API_KEY)) ? $user->API_KEY : '';                                        
                         $response = wp_remote_post( 'https://dev.dellyman.com/api/v3.0/TrackOrder', array(
                             'body'    => json_encode([
-                                'OrderID' => $item['dellyman_order_id'],
-                                'CustomerID' => 8
+                                'OrderID' => intval($item['dellyman_order_id'])
                             ]),
                             'headers' => [
-                                'Authorization' => 'Bearer '. $ApiKey
+                                'Authorization' => 'Bearer '. $ApiKey,
+                                'Content-Type' =>  'application/json'
                             ]
                         ));
-                        $status = wp_remote_retrieve_body( $response );
-                        return json_encode($status);
+                        $status = json_decode(wp_remote_retrieve_body($response),true);
+                        return $status['OrderStatus'];
                     case 'time':
                         return date("F j, Y, g:i a", strtotime($item['time'])); 
                   default:
