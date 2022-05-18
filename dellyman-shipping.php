@@ -659,7 +659,7 @@ function change_status_order(WP_REST_Request $request) {
         //Move order to deliver
         global $wpdb;
         $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
-        $body = json_decode($request->get_body(),true);
+        $body = json_decode(urldecode($request->get_body()),true);
         $orderID = $body['order']['OrderCode'];
         $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id = ". $orderID);
 
