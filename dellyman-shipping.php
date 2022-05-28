@@ -645,14 +645,12 @@ add_filter( 'wc_order_statuses', 'add_dellyman_custom_order_statuses' );
 function change_status_order(WP_REST_Request $request) {
     // In practice this function would fetch the desired data. Here we are just making stuff up.
     $key  = $request->get_header('X-Dellyman-Signature');
+    error_log($key);
     global $wpdb;
     $table_name = $wpdb->prefix . "woocommerce_dellyman_credentials"; 
     $user = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1");
-    $ApiKey =  (!empty($user->API_KEY)) ? $user->API_KEY : '';
-    $Web_HookSecret =  (!empty($user->Web_HookSecret)) ? $user->Web_HookSecret : '';
-    $webhook_url =  (!empty($user->webhook_url)) ? $user->webhook_url : ''; 
-
-    $myKey = hash_hmac('sha256', $webhook_url, $Web_HookSecret);
+    $Web_HookSecret =  (!empty($user->Web_HookSecret)) ? $user->Web_HookSecret : ''; 
+    $myKey = hash_hmac('sha256', urldecode($request->get_body()), $Web_HookSecret);
   
      
     if($key == $myKey){
@@ -660,7 +658,8 @@ function change_status_order(WP_REST_Request $request) {
         global $wpdb;
         $table_name = $wpdb->prefix . "woocommerce_dellyman_orders"; 
         $body = json_decode(urldecode($request->get_body()),true);
-        $orderID = $body['order']['OrderCode'];
+        error_log(urldecode($request->get_body()));
+        $orderID = $body['order']['OrderID'];
         $order = $wpdb->get_row("SELECT * FROM $table_name WHERE dellyman_order_id = ". $orderID);
 
         if($body['order']['OrderStatus'] == "COMPLETED"){
@@ -722,7 +721,42 @@ function prefix_register_product_routes() {
    register_rest_route( 'api', '/dellyman-webhook', array(
            'methods'  => WP_REST_Server::CREATABLE,
            'callback' => 'change_status_order',
+           'permission_callback' => '__return_true'
     ));
 }
 add_action( 'rest_api_init', 'prefix_register_product_routes' );
+
+
+add_filter ('woocommerce_account_menu_items', 'addDeliveryDetails' );
+
+    function addDeliveryDetails( $menu_links ){
+    
+    // we will hook "anyuniquetext123" later
+    $new = array( 'delivery-details' => 'Delivery details' );
+    
+    // or in case you need 2 links
+    // $new = array( 'link1' => 'Link 1', 'link2' => 'Link 2' );
+    
+    // array_slice() is good when you want to add an element between the other ones
+    $menu_links = array_slice( $menu_links, 0, 2, true ) 
+    + $new 
+    + array_slice( $menu_links, 2, NULL, true );
+    
+    
+    return $menu_links;
+    
+    
+    }
+
+     // The following controls the output content
+    add_action('parse_request', 'tigger_view' );
+    function tigger_view() {    
+        global $wp;
+        $current_url = home_url(add_query_arg(array(), $wp->request));
+        $myUrl =  get_site_url()."/my-account/delivery-details/";
+        if ($current_url == $myUrl) {
+            require_once('includes/delivery_details.php');
+            exit;
+        } 
+    }
 ?>
