@@ -131,14 +131,14 @@ select {
   padding: 8px;
   width: 100%;
 }
-.modal{
+.dellyman-modal{
     width: 516px;
     padding: 20px;
     border-radius: 10px;
     -webkit-transition: all 0.5s 0s ease;
-  -moz-transition: all 0.5s 0s ease;
-  -o-transition: all 0.5s 0s ease;
-  transition: all 0.5s 0s ease;
+    -moz-transition: all 0.5s 0s ease;
+    -o-transition: all 0.5s 0s ease;
+    transition: all 0.5s 0s ease;
 }
 .modal-info{
     margin: auto;
@@ -278,7 +278,10 @@ align-items: center;
 .mt-8{
   margin-top: 4rem;
 }
-
+.my-8{
+  margin-top: 4rem;
+  margin-bottom: 4rem;
+}
 /* Smartphones (portrait and landscape) ----------- */
 @media only screen and (max-device-width : 557px) {
 /* Styles */

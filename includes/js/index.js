@@ -33,7 +33,7 @@
                              stringOrder = JSON.stringify(element);
                              let toogle = `<div class='switch mt-3' >
                                                                 <input  class='switch-input' id='switch-${i}' type='checkbox' name='products[]'  onclick='changeQty(${i},${element.quantity})'  value='${stringOrder}'/>
-                                                                <label for="switch-${i}" class="switch-label">Switch</label>
+                                                                <label for="switch-${i}" class="switch-label"></label>
                                                         </div>`;
                              if (element.quantity <= 0 ) {
                                  toogle = `<div class="text-success mt-3">All items have been shipped</div>`
@@ -117,6 +117,7 @@ function update(key, qty) {
             jQuery("#item-" + key).append(feedback);
         }
 }
+
 jQuery(document).on("mousemove touchstart touchend", function () {
     let order = jQuery("#order").val();
     let checkboxes = new Array();
@@ -152,6 +153,7 @@ function confirm(data) {
                 jQuery('#modal-info').css("display", "none");
             }
         } else {
+            jQuery('#modal').css("display", "none");
             jQuery("#overlay").css("display", "none");
         }
 }

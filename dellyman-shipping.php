@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name:    Dellyman Shipping
+Plugin Name:    Dokan Dellyman Shipping
 Plugin URI:		https://www.dellyman.com
-Description:	Dellyman Plugin for E-commerce owners to tigger delivery and payment options for vendors
+Description:	Dellyman Plugin for Multi Vendor E-commerce to tigger delivery and payment options for vendors
 Version:		1.0.0
 Author:			Dellyman
 Author URI:		https://www.dellyman.com
@@ -130,7 +130,7 @@ class DellymanOrders extends WP_List_Table
 
             if (!empty($search)) {
                   return $wpdb->get_results(
-                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders WHERE order_id Like '%{$search}%' OR dellyman_order_id Like '%{$search}%'",
+                        "SELECT * from {$wpdb->prefix}woocommerce_dellyman_orders WHERE order_id Like '%{$search}%' OR reference_id Like '%{$search}%'",
                         ARRAY_A
                   );
             }else{
@@ -146,9 +146,9 @@ class DellymanOrders extends WP_List_Table
       {
             $columns = array(
                   'cb'            => '<input type="checkbox" />',
-                  'order_id' => 'Order Id',
-                  'dellyman_order_id' => 'Dellyman Order ID',
-                  'reference_id'    => 'Reference Id',
+                  'order_id' => 'Order id',
+                  'reference_id'    => 'Dellyman order id',
+                  'store_name'    => 'Store',
                   'item'      => 'Items',
                   'status' => 'Status',
                   'time' => 'Created'
@@ -193,9 +193,15 @@ class DellymanOrders extends WP_List_Table
             switch ($column_name) {
                   case 'order_id':
                         return '#'. $item['order_id'];
-                  case 'dellyman_order_id':
                   case 'reference_id':
                         return $item[$column_name];
+                  case  'store_name';
+                        $dokan_id = $item['order_id'];
+                        global $wpdb;
+                        $table_name = $wpdb->prefix . "woocommerce_dellyman_products"; 
+                        $product = $wpdb->get_row("SELECT * FROM $table_name WHERE order_id = '$dokan_id'",OBJECT);
+                        $store_info = dokan_get_store_info( $product->user_id);
+                        return $store_info['store_name'];
                   case 'item':
                         $order = $item['dellyman_order_id'];
                         global $wpdb;
@@ -477,10 +483,11 @@ function post_products_dellyman_request(){
         //Get Authentciation
         $seller = wp_get_current_user();
         $vendor_data = get_user_meta($seller->ID);
-        $store_address = get_option( 'woocommerce_store_address' );
-        $store_city = get_option( 'woocommerce_store_city' );
+        $store_info = dokan_get_store_info( $seller->ID );
+        $store_address = $store_info['address']['street_1'];
+        $store_city = $store_info['address']['city'];
         $pickupAddress = $store_address .', '. $store_city;
-        $vendorphone = get_user_meta($seller->ID, 'billing_phone', true);
+        $vendorphone = $store_info['phone'];
         $custPhone =  $order->get_billing_phone();
          $orderid = $_POST['order'] ;
          $customer_city = $order->get_billing_city();
@@ -727,36 +734,132 @@ function prefix_register_product_routes() {
 add_action( 'rest_api_init', 'prefix_register_product_routes' );
 
 
-add_filter ('woocommerce_account_menu_items', 'addDeliveryDetails' );
-
-    function addDeliveryDetails( $menu_links ){
-    
-    // we will hook "anyuniquetext123" later
-    $new = array( 'delivery-details' => 'Delivery details' );
-    
-    // or in case you need 2 links
-    // $new = array( 'link1' => 'Link 1', 'link2' => 'Link 2' );
-    
-    // array_slice() is good when you want to add an element between the other ones
-    $menu_links = array_slice( $menu_links, 0, 2, true ) 
-    + $new 
-    + array_slice( $menu_links, 2, NULL, true );
-    
-    
-    return $menu_links;
-    
-    
+    add_filter( 'dokan_query_var_filter', 'dokan_load_document_menu' );
+    function dokan_load_document_menu( $query_vars ) {
+        $query_vars['help'] = 'request-for-shipping';
+        return $query_vars;
+    }
+    add_filter( 'dokan_get_dashboard_nav', 'dokan_add_help_menu' );
+    function dokan_add_help_menu( $urls ) {
+        $urls['help'] = array(
+            'title' => __('Request for shipping', 'dokan'),
+            'icon'  => '<i class="fas fa-truck"></i>',
+            'url'   => dokan_get_navigation_url( 'request-for-shipping' ),
+            'pos'   => 51
+        );
+        return $urls;
+    }
+    add_action( 'dokan_load_custom_template', 'dokan_load_template' );
+    function dokan_load_template( $query_vars ) {
+        if ( isset($query_vars['request-for-shipping'] ) ) {
+            require_once ( 'includes/request.php');
+        }else {
+        // require_once ( 'includes/request.php');
+        }
+    }
+    add_filter( 'dokan_query_var_filter', 'dokan_load_delivery_status' );
+    function dokan_load_delivery_status($query_vars) {
+        $query_vars['status'] = 'check-delivery-status';
+        return $query_vars;
+    }
+    add_filter( 'dokan_get_dashboard_nav', 'dokan_add_status_menu' );
+    function dokan_add_status_menu( $urls ) {
+        $urls['status'] = array(
+            'title' => __( 'Delivery Status', 'dokan'),
+            'icon'  => '<i class="fas fa-info-circle"></i>',
+            'url'   => dokan_get_navigation_url( 'check-delivery-status' ),
+            'pos'   => 52
+        );
+        return $urls;
+    }
+    add_action( 'dokan_load_custom_template', 'dokan_load_delivery_template' );
+    function dokan_load_delivery_template($query_vars) {
+        if (isset( $query_vars['check-delivery-status'] ) ) {
+            require_once ( 'includes/delivery_details.php');
+        }
     }
 
-     // The following controls the output content
-    add_action('parse_request', 'tigger_view' );
-    function tigger_view() {    
-        global $wp;
-        $current_url = home_url(add_query_arg(array(), $wp->request));
-        $myUrl =  get_site_url()."/my-account/delivery-details/";
-        if ($current_url == $myUrl) {
-            require_once('includes/delivery_details.php');
-            exit;
-        } 
+        /**
+     * Add new custom status for WC order statuses
+     *
+     * @param array $order_statuses
+     *
+     * @return array $order_statuses
+     */
+    function dokan_add_new_custom_order_status( $order_statuses ) {
+
+        $order_statuses[ 'wc-ready-to-ship' ]           = _x( 'Ready to ship', 'Order status', 'text_domain' );
+        $order_statuses[ 'wc-partially-shipped' ]   = _x( 'Partially shipped', 'Order status', 'text_domain' );
+        $order_statuses[ 'wc-partially-deliver' ] = _x( 'Partially Delivered', 'Order status', 'text_domain' );
+        $order_statuses[ 'wc-fully-shipped' ] = _x( 'Fully Shipped', 'Order status', 'text_domain' );
+        $order_statuses[ 'wc-fully-delivered' ] = _x( 'Fully Delivered', 'Order status', 'text_domain' );
+        
+        return $order_statuses;
     }
+
+    add_filter( 'wc_order_statuses', 'dokan_add_new_custom_order_status', 12, 1 );
+
+    /**
+     * Add new custom status button class on order status
+     *
+     * @param string $text
+     * @param string $status
+     *
+     * @return string $text
+     */
+    function dokan_add_custom_order_status_button_class( $text, $status ) {
+        switch ( $status ) {
+            case 'wc-ready-to-ship':
+            case 'ready-to-ship':
+            case 'wc-partially-shipped':
+            case 'partially-shipped':
+            case 'wc-partially-deliver':
+            case 'partially-deliver':
+            case 'wc-fully-shipped':
+            case 'fully-shipped':
+            case 'wc-fully-delivered':
+            case 'fully-delivered':
+                $text = 'success';
+            break;        
+        }    
+        return $text;
+    }
+    add_filter( 'dokan_get_order_status_class', 'dokan_add_custom_order_status_button_class', 10, 2 );
+
+
+    /**
+     * Custom order status translated
+     *
+     * @param string $text
+     * @param string $status
+     *
+     * @return string $text
+     */
+    function dokan_add_custom_order_status_translated( $text, $status ) {
+        switch ( $status ) {
+            case 'wc-ready-to-ship':
+            case 'ready-to-ship':
+                $text = __( 'Ready to Ship', 'text_domain' );
+                break;
+            case 'wc-partially-shipped':
+            case 'partially-shipped':
+                $text = __( 'Partially shipped', 'text_domain' );
+                break;
+            case 'wc-partially-deliver':
+            case 'partially-deliver':
+                $text = __( 'Partially delivered', 'text_domain' );
+                break; 
+            case 'wc-fully-shipped':
+            case 'fully-shipped':
+                $text = __( 'Fully Shipped', 'text_domain' );
+                break; 
+            case 'wc-fully-delivered':
+            case 'fully-delivered':
+                $text = __( 'Fully Delivered', 'text_domain' );
+                break;         
+        }    
+        return $text;
+    }
+    add_filter( 'dokan_get_order_status_translated', 'dokan_add_custom_order_status_translated', 10, 2 );
+    
 ?>
