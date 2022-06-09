@@ -255,7 +255,8 @@ class DellymanOrders extends WP_List_Table
             $sortable_columns = array(
                   'order_id'  => array('order_id', false),
                   'dellyman_order_id' => array('dellyman_order_id', false),
-                  'reference_id'   => array('reference_id', true)
+                  'reference_id'   => array('reference_id', true),
+                  'time'   => array('time', true)
             );
             return $sortable_columns;
       }
@@ -264,13 +265,13 @@ class DellymanOrders extends WP_List_Table
       function usort_reorder($a, $b)
       {
             // If no sort, default to user_login
-            $orderby = (!empty($_GET['orderby'])) ? $_GET['orderby'] : 'order_id';
+            $orderby = (!empty($_GET['orderby'])) ? $_GET['orderby'] : 'time';
             // If no order, default to asc
-            $order = (!empty($_GET['order'])) ? $_GET['order'] : 'asc';
+            $order = (!empty($_GET['order'])) ? $_GET['order'] : 'desc';
             // Determine sort order
             $result = strcmp($a[$orderby], $b[$orderby]);
             // Send final sort direction to usort
-            return ($order === 'asc') ? $result : -$result;
+            return ($order != 'desc') ? $result : -$result;
       }
 }
 
@@ -341,7 +342,7 @@ function bookOrder($carrier,$vendor_data,$shipping_address, $productNames,$picku
     $phoneNumber = $vendor_data['billing_address_1'];
     $deliveredName = $shipping_address['first_name'] ." ". $shipping_address['last_name'];
     //booking order
-    $date =  date("d/m/Y");
+    $date =  date("m/d/Y");
     $postdata = array( 
         'CustomerID' => 0,
         'PaymentMode' => 'online',
